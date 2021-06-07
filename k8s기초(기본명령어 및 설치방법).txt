@@ -1,0 +1,174 @@
+kubernetes 공부 관련 
+# docker 사용시 설치 필요, docker를 사용하지 않는 경우 virtual box 설치
+curl -fsSL https://get.docker.com/ | sudo sh
+sudo usermod -aG docker $USER
+
+# docker 대신 virtual box 설치
+sudo apt-get install virtualbox
+
+# install minikube
+curl -Lo minikube https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 \
+  && chmod +x minikube
+sudo mkdir -p /usr/local/bin/
+sudo install minikube /usr/local/bin
+
+minikube명령어
+# 버전확인
+minikube version
+# 가상머신 시작
+minikube start --driver=docker
+# driver 에러가 발생한다면 virtual box를 사용
+minikube start --driver=virtualbox
+# 특정 k8s 버전 실행
+minikube start --kubernetes-version=v1.20.0
+# 상태확인
+minikube status
+# 정지
+minikube stop
+# 삭제
+minikube delete
+# ssh 접속
+minikube ssh
+# ip 확인
+minikube ip
+
+# 가상머신 시작
+minikube start # 기본 profile - minikube로 생성
+# 두번째 가상머신 시작
+minikube start -p hellowolrd # helloworld 라는 이름의 profile로 생성
+# profile 목록 확인
+minikube profile list
+# 현재 사용중인 profile 확인
+minikube profile
+# 다른 profile로 변경
+minikube profile hellowolrd # helloworld로 변경
+minikube profile minikube # minikube로 변경
+# 가상머신 제거
+minikube delete # 현재 사용중인 profile의 가상머신 제거
+
+kubectl 설치 (K8s에 명령어를 전달하기 위한 툴)
+#리눅스 기준
+curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x ./kubectl
+sudo mv ./kubectl /usr/local/bin/kubectl
+
+#윈도우 기준
+curl -LO https://storage.googleapis.com/kubernetes-release/release/v1.20.0/bin/windows/amd64/kubectl.exe
+
+#test
+kubectl version
+아래와 같이 나와야함.
+Client Version: version.Info{Major:"1", Minor:"20", GitVersion:"v1.20.0", GitCommit:"af46c47ce925f4c4ad5cc8d1fca46c7b77d13b38", GitTreeState:"clean", BuildDate:"2020-12-08T17:59:43Z", GoVersion:"go1.15.5", Compiler:"gc", Platform:"darwin/amd64"}
+Server Version: version.Info{Major:"1", Minor:"20", GitVersion:"v1.20.0", GitCommit:"af46c47ce925f4c4ad5cc8d1fca46c7b77d13b38", GitTreeState:"clean", BuildDate:"2020-12-08T17:51:19Z", GoVersion:"go1.15.5", Compiler:"gc", Platform:"linux/amd64"}
+(linux기준, minikube가 1개라도 켜져 있어야 위와같이 나옴.)
+
+그외 것들
+kubectx (opens new window)- 컨텍스트 전환 CLI
+kubens (opens new window)- namespace 전환 CLI
+k9s (opens new window)- 클러스터 관리 CLI
+kubespy (opens new window)- 쿠버네티스 상태를 실시간으로 확인합니다.
+stern (opens new window)- 통합 로그 관리 도구
+Lens (opens new window)- 클러스터 관리 GUI
+
+실습1 wordpress 배포하기
+yml파일 만들기 (폴더내부에 있는 worldpress-k8s.yml파일)
+
+# minikube 상태확인
+minikube status
+# minikube 실행
+minikube start
+#wordpress-k8s.yml 설정 적용
+kubectl apply -f wordpress-k8s.yml
+#현재 상태 확인
+kubectl get all
+여기서 나온 service가 running상태로 변경되면, port부분을 기억하고
+"minikube ip 명령어를 이용해서 나온 ip:위의 port부분"을 입력하면 wordpress가 나옴
+#워드프레스 리소스를 제거
+kubectl delete -f wordpress-k8s.yml
+
+#kubectl명령어
+apply = 원하는 상태를 적용합니다. 보통 -f 옵션으로 파일과 함께 사용합니다.
+get = 리소스 목록을 보여줍니다.
+describe = 리소스의 상태를 자세하게 보여줍니다.
+delete = 리소스를 제거합니다.
+logs = 컨테이너의 로그를 봅니다.
+exec = 컨테이너에 명령어를 전달합니다. 컨테이너에 접근할 때 주로 사용합니다.
+config = kubectl 설정을 관리합니다.
+
+※alias로 편하게 사용 가능함
+#alias 설정
+alias k = 'kubectl'
+#shell 설정 추가
+echo "alias k='kebectl'" >> ~/.bashrc
+source ~/.bashrc
+
+상태설정하기 (apply)
+apply명령어는 설정 파일 명 뿐만 아니라 URL도 입력이 가능함.
+kubectl apply -f [파일명 또는 URL]
+# 다시 한번 워드프레스 배포하기 (URL로!)
+kubectl apply -f https://subicura.com/k8s/code/guide/index/wordpress-k8s.yml
+
+리소스 목록보기 (get)
+kubectl get [TYPE]
+# Pod 조회
+kubectl get pod
+# 줄임말(Shortname)과 복수형 사용가능
+kubectl get pods
+kubectl get po
+# 여러 TYPE 입력
+kubectl get pod,service
+#
+kubectl get po,svc
+# Pod, ReplicaSet, Deployment, Service, Job 조회 => all
+kubectl get all
+# 결과 포멧 변경
+kubectl get pod -o wide
+kubectl get pod -o yaml
+kubectl get pod -o json
+# Label 조회
+kubectl get pod --show-labels
+
+리소스 상세 상태보기 (describe)
+kubectl describe [TYPE]/[NAME] 또는 [TYPE] [NAME]
+특정 리소스의 상태가 궁금하거나, 생성이 실패한 이유를 확일할 때 주로 사용
+# Pod 조회로 이름 검색
+kubectl get pod
+# 조회한 이름으로 상세 확인
+kubectl describe pod/wordpress-5f59577d4d-8t2dg # 환경마다 이름이 다릅니다
+
+리소스 제거 (delete)
+kubectl delete [TYPE]/[NAME] 또는 [TYPE] [NAME]
+# Pod 조회로 이름 검색
+kubectl get pod
+# 조회한 Pod 제거
+kubectl delete pod/wordpress-5f59577d4d-8t2dg
+
+컨테이너 로그 조회(logs)
+실시간 로그는 -f 옵션, pod에 여러개의 컨테이너가 있는경우 -c옵션으로 컨테이너 지정
+kubectl logs [POD_NAME]
+# Pod 조회로 이름 검색
+kubectl get pod
+# 조회한 Pod 로그조회
+kubectl logs wordpress-5f59577d4d-8t2dg
+# 실시간 로그 보기
+kubectl logs -f wordpress-5f59577d4d-8t2dg
+
+컨테이너 명령어 전달(exec)
+쉘로 접속하는 경우 -it옵션, 여러개의 컨테이너에 접속하는 경우 -c옵션
+kubectl exec [-it] [POD_NAME] -- [COMMAND]
+# Pod 조회로 이름 검색
+kubectl get pod
+# 조회한 Pod의 컨테이너에 접속
+kubectl exec -it wordpress-5f59577d4d-8t2dg -- bash
+
+설정관리(config)
+kubectl은 여러개의 클러스터를 context로 설정하고 필요에 따라 선택 가능하며, context확인 및 지정 가능
+# 현재 컨텍스트 확인
+kubectl config current-context
+# 컨텍스트 설정
+kubectl config use-context minikube
+※그 외
+# 전체 오브젝트 종류 확인
+kubectl api-resources
+# 특정 오브젝트 설명 보기
+kubectl explain pod
