@@ -60,3 +60,46 @@ kubectl get po,rs,deploy
 실행후 결과를 보면 pod의 기존 버전은 전부 삭제가 되며, 새로운 버전의 pod가 생성된다.
 Deployment는 새로운 이미지로 업데이트하기 위해 Replicaset을 이용하는데, 버전을 업데이트 하게 되면 새로운 ReplicaSet을
 생성하고 새로운 버전의 pod를 생성한다.
+
+Deployment과정
+[사진(deployment)-1.PNG파일 참조]
+새로운 ReplicaSet을 0->1개로 조정하고 정상적으로 pod가 동작하면 기존 ReplicaSet을 4->3개로 조정함
+[사진(deployment)-2.PNG파일 참조]
+새로운 ReplicaSet을 1->2개로 조정하고 정상적으로 pod가 동작하면 기존 ReplicaSet을 3->2개로 조정함
+[사진(deployment)-3.PNG파일 참조]
+새로운 ReplicaSet을 2->3개로 조정하고 정상적으로 pod가 동작하면 기존 ReplicaSet을 2->1개로 조정함
+[사진(deployment)-4.PNG파일 참조]
+새로운 ReplicaSet을 3->4개로 조정하고 정상적으로 pod가 동작하면 기존 ReplicaSet을 1->0개로 조정함
+[사진(deployment)-5.PNG파일 참조]
+완료.
+
+#생성한 Deployment의 상세상태 확인
+kubectl describe deploy/echo-deploy
+
+API서버로부터 Deployment컨트롤러,ReplicaSet컨트롤러,Secheduler은 아래와 같이 동작함.[그림(deploymen)-6.PNG 참조]
+
+1.Deployment Controller는 Deployment조건을 감시하면서 현재 상태와 원하는 상태를 체크
+2.Deployment Controller가 원하는 상태가 되도록 ReplicaSet을 설정
+3.ReplicaSet Controller는 ReplicaSet조건을 감시하면서 현재 상태와 원하는 상태를 체크
+4.ReplicaSet Controller가 원하는 상태가 되도록 Pod를 생성또는 제거
+5.Scheduler는 API서버를 감시하면서 할당되지 않은Pod가 있는지 체크
+6.Scheduler는 할당되지 않은 새로운 Pod를 감지하고 적절한 노드에 배치
+7.이후 노드는 기존대로 동작
+
+※Deployment는 Deployment컨트롤러가 관리하며, ReplicaSet,pod는 기존 Controller와 Scheduler가 관리.
+
+버전관리
+Deployment는 변경된 상태를 기록함.
+# 히스토리 확인
+kubectl rollout history deploy/echo-deploy
+# revision 1 히스토리 상세 확인
+kubectl rollout history deploy/echo-deploy --revision=1
+# 바로 전으로 롤백
+kubectl rollout undo deploy/echo-deploy
+# 특정 버전으로 롤백
+kubectl rollout undo deploy/echo-deploy --to-revision=2
+
+배포전략 설정
+Deployment에는 다양한 방식의 배포전략이 있음.
+여기서 RollingUpdate방식을 사용함과 동시에 업데이트하는 pod의 갯수를 변경
+==================echo-strategy.yml==============
