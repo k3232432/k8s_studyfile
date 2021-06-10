@@ -103,3 +103,33 @@ kubectl rollout undo deploy/echo-deploy --to-revision=2
 Deployment에는 다양한 방식의 배포전략이 있음.
 여기서 RollingUpdate방식을 사용함과 동시에 업데이트하는 pod의 갯수를 변경
 ==================echo-strategy.yml==============
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: echo-deploy-st
+spec:
+  replicas: 4
+  selector:
+    matchLabels:
+      app: echo
+      tier: app
+  minReadySeconds: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 3
+      maxUnavailable: 3
+  template:
+    metadata:
+      labels:
+        app: echo
+        tier: app
+    spec:
+      containers:
+        - name: echo
+          image: ghcr.io/subicura/echo:v1
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+==================================================
