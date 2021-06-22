@@ -51,3 +51,106 @@ spec:
 ※하나의 ymal파일에 여러개의 리소스를 정의할때에는 "---"를 구분자로 사용
 redis 생성
 kubectl apply -f counter-redis-svc.yml
+#pod, ReplicaSet, Deployment, Service 상태 확인
+kubectl get all
+redis Deployment와 Service가 생성된것을 확인 가능.
+
+같은 클러스터에서 생성된 pod라면 redis라는 도메인으로 redisPod로 접근이 가능함.[(service-2).PNG참고]
+※redis.default.svc.cluster.local로도 접근이 가능하며, 서로다른 namespace와 cluster를 구분할 수 있음.
+ClusterIP 서비스 설정
+정의			설명
+spec.ports.port		서비스가 생성할 Port
+spec.ports.targetPort	서비스가 접근할 pod의 Port(기본:Port와 동일)
+spec.selector		서비스가 접근할 Pod의 label조건
+
+redis Service의 selector는 redis Deployment에 정의한 label을 사용했기 때문에 해당 pod를 가리김
+해당 pod의 6379포트로 연결테스트 진행
+redis에 접근한 counter앱을 Deployment로 생성
+====================counter-app.yml===========
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: counter
+spec:
+  selector:
+    matchLabels:
+      app: counter
+      tier: app
+  template:
+    metadata:
+      labels:
+        app: counter
+        tier: app
+    spec:
+      containers:
+        - name: counter
+          image: ghcr.io/subicura/counter:latest
+          env:
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+=================================================
+counter app pod에서 redis pod로 접근이 되는지 테스트
+kubectl apply -f counter-app.yml
+# counter app에 접근
+kubectl get po
+# counter app에 접근
+kubectl exec -it counter-<podname정보 -- sh
+--counter에서
+app # apk add curl busybox-extras # install telnet
+app # curl localhost:3000
+app # curl localhost:3000
+app # telnet redis 6379
+--redis에서
+(inDB)  dbsize
+(inDB)  KEYS *
+(inDB)  GET count
+(inDB)  quit
+
+Service 생성 흐름
+Service는 각 pod를 바라보는 로드밸런서 역활을 하면서 내부 도메인 서버에 새로운 도메인 서버를 생성[(service-3).PNG참조]
+1. Endpoint Controller는 Service와 pod을 감시하면서 조건에 맞는 pod의 IP를 수집
+2. Endpoint Controller가 수집한 IP를 가지고 Endpoint 생성
+3. Kube-Proxy는 Endpoint 변화를 감시하고 노드의 iptables을 설정
+4. CoreDNS는 Service를 감시하고 서비스 이름과 IP를 CoreDNS에 추가
+
+iptalbes는 Kernel레벨의 네트워크 도우이며, CoreDNS는 빠르고 편리하게 사용할 수 있는 클러스터 내부용 DNS임
+각각의 역할은 iptables 설정으로 여러 ip에 트래픽을 전달하고 CoreDNS를 이용하여 ip대신 도메인 이름을 사용함.
+※ iptables : iptables는 규칙이 많아지면 성능저하가 일어나기때문에 ipvs를 사용하는 옵션도 존재
+※ CoreDNS : CoreDNS는 클러스터에서 호환성을 위해 kube-dns라는 이름으로 생성됨
+
+위의 설명에서 Endpoint가 나왔는데 
+Endpoint는 서비스의 접속정보를 가지고 있음.
+kubectl get endpoints
+kubectl get ep
+#redis Endpoint 확인
+kubectl describe ep/redis
+Endpoint Addresses 정보에 Redis pod의 ip를 볼 수 있음.(Replicas가 여러개라면 여러 ip확인이 가능)
+
+Service(NodePort)만들기
+ClusterIP는 클러스터 내부에서만 접근할 수 있음. 클러스터 외부(node)에서 접근할 수 있도록 NodePort서비스 생성
+======================counter-nodeport.yml================
+apiVersion: v1
+kind: Service
+metadata:
+  name: counter-np
+spec:
+  type: NodePort
+  ports:
+    - port: 3000
+      protocol: TCP
+      nodePort: 31000
+  selector:
+    app: counter
+    tier: app
+======================================================
+정의 			설명
+spec.ports.nodePort	노드에 오픈할 Port(미지정시 30000-32768중에
+
+counter app을 해당 노드의 31000으로 오픈합니다.
+kubectl apply -f counter-nodeport.yml
+#서비스 상태 확인
+kubectl get svc
+
+
